@@ -104,12 +104,12 @@ export function fileHierarchy(
     const marker = path.has(id)
       ? " [loop]"
       : expanded.has(key)
-        ? " [above]"
+        ? " [aforementioned]"
         : depth === MAX_DEPTH && children.length
           ? " [depth limit]"
           : "";
     const name = safeText(
-      `${"    ".repeat(depth)}${depth ? "-> " : ""}${label(declaration)}${marker}`,
+      `${"    ".repeat(depth)}${label(declaration)}${marker}`,
     );
     const text = safeText(`${name}\t${declaration.file}:${declaration.line}`);
     printed.add(id);
@@ -119,7 +119,7 @@ export function fileHierarchy(
       pathText: text.slice(name.length),
       bold: declaration.id === focus,
       target: id,
-      aboveRow: marker === " [above]" ? expanded.get(key) : undefined,
+      aboveRow: marker === " [aforementioned]" ? expanded.get(key) : undefined,
     });
     if (marker) return;
     expanded.set(key, rows.length - 1);

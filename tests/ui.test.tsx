@@ -279,13 +279,45 @@ test("g follows above rows, including offscreen origins, and otherwise goes to t
   try {
     await setTimeout(50);
     await press("G");
-    assert.match(app.lastFrame()!, /shared\(\) \[above\]/);
+    assert.match(app.lastFrame()!, /shared\(\) \[aforementioned\]/);
     assert.match(app.lastFrame()!, /28\/28/);
     await press("g");
     assert.match(app.lastFrame()!, /2\/28/);
     assert.match(app.lastFrame()!, /shared\(\) +main.ts/);
     await press("g");
     assert.match(app.lastFrame()!, /1\/28/);
+  } finally {
+    app.unmount();
+    app.cleanup();
+  }
+});
+
+test("y saves acceptance, restores it in a new view, and toggles it off", async () => {
+  const { Acceptance } = await import("../src/acceptance.js");
+  const directory = join(sourceRoot, "acceptance");
+  const open = () =>
+    render(
+      <Explorer
+        snapshot={snapshot}
+        initialHierarchyTarget="run"
+        acceptanceDirectory={directory}
+      />,
+    );
+  let app = open();
+  try {
+    await setTimeout(50);
+    app.stdin.write("y");
+    await setTimeout(50);
+    assert.match(app.lastFrame()!, /Accepted/);
+    assert.equal(new Acceptance(snapshot, directory).accepted.has("run"), true);
+    app.unmount();
+    app.cleanup();
+    app = open();
+    await setTimeout(50);
+    app.stdin.write("y");
+    await setTimeout(50);
+    assert.match(app.lastFrame()!, /Acceptance removed/);
+    assert.equal(new Acceptance(snapshot, directory).accepted.size, 0);
   } finally {
     app.unmount();
     app.cleanup();

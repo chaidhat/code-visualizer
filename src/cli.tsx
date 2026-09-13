@@ -32,7 +32,8 @@ Unknown or duplicate names print a message. Quote names containing spaces.
   h, Escape      Return to the previous page
   ←/→            Scroll source sideways
   PgUp/PgDn      Scroll a page
-  g/G            First/last row, or jump to [above] with g
+  g/G            First/last row, or jump to [aforementioned] with g
+  y              Toggle acceptance, saved under ~/.cvis/accepted/
   q              Quit
   Ctrl+C         Clear the terminal and quit
 

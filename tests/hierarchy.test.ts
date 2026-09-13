@@ -50,15 +50,18 @@ test("hierarchy shows callers, loops, repeated branches, and selected-declaratio
   const rows = fileHierarchy(data, "selected.ts", "focus");
   assert.equal(rows[0]!.target, "caller");
   for (const [index, row] of rows.entries()) {
-    if (row.name?.includes("[above]")) {
+    if (row.name?.includes("[aforementioned]")) {
       assert.ok(row.aboveRow !== undefined && row.aboveRow < index);
       assert.equal(rows[row.aboveRow!]!.target, row.target);
-      assert.doesNotMatch(rows[row.aboveRow!]!.text, /\[above\]|\[loop\]/);
+      assert.doesNotMatch(
+        rows[row.aboveRow!]!.text,
+        /\[aforementioned\]|\[loop\]/,
+      );
     } else assert.equal(row.aboveRow, undefined);
   }
   assert.match(rows.map((row) => row.text).join("\n"), /caller\(\) \[loop\]/);
   assert.equal(
-    rows.filter((row) => row.name?.includes("func2() [above]")).length,
+    rows.filter((row) => row.name?.includes("func2() [aforementioned]")).length,
     1,
   );
   assert.equal(rows.find((row) => row.target === "focus")!.bold, true);
@@ -94,7 +97,7 @@ test("hierarchy handles self calls, duplicate links, objects, and empty files", 
   const rows = fileHierarchy(data, "selected.ts");
   assert.equal(rows.length, 3);
   assert.match(rows[1]!.text, /focus\(\) \[loop\]/);
-  assert.match(rows[2]!.text, /-> object +other.ts/);
+  assert.match(rows[2]!.text, /^    object +other.ts/);
   assert.equal(fileHierarchy(data, "empty.ts")[0]!.text, "(no declarations)");
 });
 

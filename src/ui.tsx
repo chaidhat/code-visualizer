@@ -1,5 +1,6 @@
 import { memo, useEffect, useMemo, useState } from "react";
 import { Box, Text, useApp, useInput, useStdout } from "ink";
+import { Acceptance } from "./acceptance.js";
 import { fileHierarchy } from "./hierarchy.js";
 import type { Snapshot } from "./model.js";
 import { label, safeText, sourceRows, sourceSegments } from "./display.js";
@@ -30,6 +31,7 @@ const VisibleRow = memo(function VisibleRow({
   pathText,
   bold,
   segments,
+  accepted,
 }: {
   text: string;
   selected: boolean;
@@ -38,6 +40,7 @@ const VisibleRow = memo(function VisibleRow({
   name?: string;
   pathText?: string;
   bold?: boolean;
+  accepted?: boolean;
 }) {
   return (
     <Text inverse={name === undefined && selected} wrap="truncate-end">
@@ -47,7 +50,8 @@ const VisibleRow = memo(function VisibleRow({
             bold={bold}
             inverse={selected}
             backgroundColor={origin ? "yellow" : undefined}
-            color={origin ? "black" : undefined}
+            color={accepted ? "#999999" : origin ? "black" : undefined}
+            dimColor={accepted}
           >
             {name}
           </Text>
@@ -72,11 +76,20 @@ export function Explorer({
   snapshot,
   initialHierarchyTarget,
   onInterrupt,
+  acceptanceDirectory,
 }: {
   snapshot: Snapshot;
   initialHierarchyTarget: string;
   onInterrupt?: () => void;
+  acceptanceDirectory?: string;
 }) {
+  const [acceptance] = useState(
+    () => new Acceptance(snapshot, acceptanceDirectory),
+  );
+  const [, refreshAcceptance] = useState(0);
+  const [acceptanceMessage, setAcceptanceMessage] = useState(
+    acceptance.warning,
+  );
   const { exit } = useApp();
   const { stdout } = useStdout();
   const [size, setSize] = useState({
@@ -124,6 +137,21 @@ export function Explorer({
     if (key.ctrl && input === "c") {
       onInterrupt?.();
       exit();
+      return;
+    }
+    if (input === "y" && !key.ctrl && !key.meta) {
+      const target = page.target ?? rows[page.cursor]?.target;
+      if (target) {
+        try {
+          const accepted = acceptance.toggle(target);
+          refreshAcceptance((value) => value + 1);
+          setAcceptanceMessage(accepted ? "Accepted" : "Acceptance removed");
+        } catch (error) {
+          setAcceptanceMessage(
+            `Could not save acceptance: ${safeText(error instanceof Error ? error.message : String(error))}`,
+          );
+        }
+      }
       return;
     }
     if (input === "q") {
@@ -191,8 +219,8 @@ export function Explorer({
       </Text>
       <Text wrap="truncate-end" dimColor>
         {page.target
-          ? "j/k scroll  h back  q quit"
-          : "j/k move  g jump to [above]  l open  q quit"}
+          ? "j/k scroll  y accept/undo  h back  q quit"
+          : "j/k move  g jump  l open  y accept/undo  q quit"}
       </Text>
       <Box flexDirection="column" height={height}>
         {rows.slice(start, start + height).map((row, index) => (
@@ -203,6 +231,9 @@ export function Explorer({
             name={row.name}
             pathText={row.pathText}
             bold={row.bold}
+            accepted={
+              row.target !== undefined && acceptance.accepted.has(row.target)
+            }
             segments={
               page.target ? sourceSegments(row, page.horizontal) : undefined
             }
@@ -211,7 +242,8 @@ export function Explorer({
         ))}
       </Box>
       <Text wrap="truncate-end" dimColor>
-        {`${page.cursor + 1}/${rows.length}  ${snapshot.files.length} files${snapshot.analysis ? `, ${snapshot.analysis.reusedFiles} reused` : ""}  ${snapshot.warnings.length} warnings  Keep files unchanged, restart after edits`}
+        {acceptanceMessage ??
+          `${page.cursor + 1}/${rows.length}  ${snapshot.files.length} files${snapshot.analysis ? `, ${snapshot.analysis.reusedFiles} reused` : ""}  ${snapshot.warnings.length} warnings  Keep files unchanged, restart after edits`}
       </Text>
     </Box>
   );
