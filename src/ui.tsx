@@ -49,9 +49,8 @@ const VisibleRow = memo(function VisibleRow({
           <Text
             bold={bold}
             inverse={selected}
-            backgroundColor={origin ? "yellow" : undefined}
-            color={accepted ? "#999999" : origin ? "black" : undefined}
-            dimColor={accepted}
+            backgroundColor={origin ? "blue" : undefined}
+            color={origin ? "white" : accepted ? "green" : undefined}
           >
             {name}
           </Text>
