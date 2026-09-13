@@ -19,7 +19,12 @@ assert.equal(plain.status, 0, plain.stderr);
 assert.match(plain.stdout, /saveDraft\(\)\s+actions.ts:1/);
 assert.match(plain.stdout, /submit\(\)/);
 assert.doesNotMatch(plain.stdout, /\x1b/);
-assert.match(run("--help").stdout, /Usage: cvis/);
+const plaintext = run(fixture, "submit", "--plaintext");
+assert.equal(plaintext.status, 0, plaintext.stderr);
+assert.equal(plaintext.stderr, "");
+assert.equal(plaintext.stdout, plain.stdout);
+assert.doesNotMatch(plaintext.stdout, /\x1b|Finding TypeScript|j\/k move/);
+assert.match(run("--help").stdout, /--plaintext/);
 assert.equal(run("--version").stdout.trim(), "0.1.0");
 assert.equal(run().status, 1);
 assert.equal(run("--unknown").status, 1);
@@ -27,6 +32,7 @@ assert.equal(run("/does-not-exist-cvis", "hello").status, 1);
 for (const args of [
   [fixture],
   [fixture, "--plain"],
+  [fixture, "--plaintext"],
   [fixture, ""],
   [fixture, "   "],
 ]) {

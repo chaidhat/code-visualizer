@@ -183,9 +183,10 @@ test("loading shows discovered totals and distinguishes reading from analysis", 
   }
 });
 
-test("Ctrl+C requests terminal clearing in the explorer and during loading", async () => {
+test("Ctrl+C requests terminal clearing in hierarchy, source and during loading", async () => {
   const { ReadingProgress } = await import("../src/reading-progress.js");
-  for (const loading of [false, true]) {
+  for (const view of ["hierarchy", "source", "loading"]) {
+    const loading = view === "loading";
     let interrupted = false;
     const onInterrupt = () => {
       interrupted = true;
@@ -203,6 +204,10 @@ test("Ctrl+C requests terminal clearing in the explorer and during loading", asy
     );
     try {
       await setTimeout(50);
+      if (view === "source") {
+        app.stdin.write("l");
+        await setTimeout(50);
+      }
       app.stdin.write("\x03");
       await setTimeout(30);
       assert.equal(interrupted, true);
@@ -318,6 +323,127 @@ test("y saves acceptance, restores it in a new view, and toggles it off", async 
     await setTimeout(50);
     assert.match(app.lastFrame()!, /Acceptance removed/);
     assert.equal(new Acceptance(snapshot, directory).accepted.size, 0);
+  } finally {
+    app.unmount();
+    app.cleanup();
+  }
+});
+
+test("source opens at the first child and visits every mention in both directions", async () => {
+  const { analyze } = await import("../src/analyze.js");
+  const root = mkdtempSync(join(sourceRoot, "children-"));
+  writeFileSync(
+    join(root, "main.ts"),
+    [
+      "function child() {}",
+      "function other() {}",
+      "function parent() {",
+      ...Array.from({ length: 25 }, () => "  // child() is only a comment"),
+      "  child(); child();",
+      ...Array.from({ length: 25 }, () => "  // gap"),
+      "  other();",
+      "}",
+    ].join("\n"),
+  );
+  const data = analyze(root);
+  const parent = [...data.declarations.values()].find(
+    (item) => item.name === "parent",
+  )!;
+  const app = render(
+    <Explorer snapshot={data} initialHierarchyTarget={parent.id} />,
+  );
+  const press = async (key: string) => {
+    app.stdin.write(key);
+    await setTimeout(50);
+  };
+  try {
+    await setTimeout(50);
+    await press("l");
+    assert.match(app.lastFrame()!, /27\/54  Child 1\/3/);
+    assert.match(app.lastFrame()!, /child\(\); child\(\);/);
+    await press("N");
+    assert.match(app.lastFrame()!, /Child 1\/3/);
+    await press("n");
+    assert.match(app.lastFrame()!, /27\/54  Child 2\/3/);
+    await press("n");
+    assert.match(app.lastFrame()!, /53\/54  Child 3\/3/);
+    assert.match(app.lastFrame()!, /other\(\);/);
+    await press("n");
+    assert.match(app.lastFrame()!, /Child 3\/3/);
+    await press("N");
+    assert.match(app.lastFrame()!, /27\/54  Child 2\/3/);
+    await press("N");
+    assert.match(app.lastFrame()!, /Child 1\/3/);
+    await press("h");
+    assert.match(app.lastFrame()!, /File hierarchy/);
+  } finally {
+    app.unmount();
+    app.cleanup();
+  }
+});
+
+test("Cmd+C copies the selected absolute file path and reports clipboard failures without exiting", async () => {
+  const copied: string[] = [];
+  let fail = false;
+  let interrupted = false;
+  const data: Snapshot = {
+    ...snapshot,
+    declarations: new Map([
+      ...snapshot.declarations,
+      [
+        "child",
+        {
+          ...snapshot.declarations.get("run")!,
+          id: "child",
+          name: "child",
+          file: "folder with spaces/child.ts",
+        },
+      ],
+    ]),
+    connections: [
+      {
+        from: "run",
+        to: "child",
+        label: "child",
+        kind: "call",
+        status: "resolved",
+        line: 1,
+      },
+    ],
+  };
+  const app = render(
+    <Explorer
+      snapshot={data}
+      initialHierarchyTarget="run"
+      onInterrupt={() => {
+        interrupted = true;
+      }}
+      copyText={async (text) => {
+        if (fail) throw new Error("clipboard unavailable");
+        copied.push(text);
+      }}
+    />,
+  );
+  const press = async (key: string) => {
+    app.stdin.write(key);
+    await setTimeout(50);
+  };
+  try {
+    await setTimeout(50);
+    await press("j");
+    await press("\x1b[99;9u");
+    assert.deepEqual(copied, [join(sourceRoot, "folder with spaces/child.ts")]);
+    assert.match(app.lastFrame()!, /File path copied/);
+    assert.equal(interrupted, false);
+    fail = true;
+    await press("\x1b[99;9u");
+    assert.match(app.lastFrame()!, /Could not copy file path/);
+    assert.equal(interrupted, false);
+    await press("k");
+    fail = false;
+    await press("\x1b[99;9u");
+    assert.equal(copied[1], join(sourceRoot, "main.ts"));
+    assert.match(app.lastFrame()!, /File hierarchy/);
   } finally {
     app.unmount();
     app.cleanup();

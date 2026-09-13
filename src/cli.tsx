@@ -17,11 +17,12 @@ try {
       help: { type: "boolean", short: "h" },
       version: { type: "boolean", short: "v" },
       plain: { type: "boolean" },
+      plaintext: { type: "boolean" },
     },
     allowPositionals: true,
   });
   if (values.help) {
-    console.log(`Usage: cvis <path/file> <name> [--plain]
+    console.log(`Usage: cvis <path/file> <name> [--plaintext]
 
 Explore .ts, .tsx, .mts and .cts files, excluding declaration-only files.
 A function or object name is required and matches exactly, including case.
@@ -35,9 +36,11 @@ Unknown or duplicate names print a message. Quote names containing spaces.
   g/G            First/last row, or jump to [aforementioned] with g
   y              Toggle acceptance, saved under ~/.cvis/accepted/
   q              Quit
+  Cmd+C          Copy selected file path in hierarchy (terminal must forward it)
   Ctrl+C         Clear the terminal and quit
 
---plain          Print the hierarchy without interaction
+--plaintext      Print the hierarchy once without formatting or interaction
+--plain          Alias for --plaintext
 --version, -v    Print version
 --help, -h       Show help
 
@@ -57,7 +60,10 @@ Only resolved connections within the selected file or folder are shown.`);
       );
     const name = positionals[1];
     const interactive =
-      !values.plain && !!process.stdin.isTTY && !!process.stdout.isTTY;
+      !values.plain &&
+      !values.plaintext &&
+      !!process.stdin.isTTY &&
+      !!process.stdout.isTTY;
     if (interactive) {
       const [{ render }, { Explorer }, { ReadingProgress }] = await Promise.all(
         [import("ink"), import("./ui.js"), import("./reading-progress.js")],
@@ -68,6 +74,7 @@ Only resolved connections within the selected file or folder are shown.`);
       };
       const app = render(<ReadingProgress onInterrupt={onInterrupt} />, {
         exitOnCtrlC: false,
+        kittyKeyboard: { mode: "auto" },
         incrementalRendering: true,
         maxFps: 60,
       });

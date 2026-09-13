@@ -343,7 +343,44 @@ test("source highlights resolved function and object mentions, excluding strings
           row.text.slice(span.start, span.end),
         ),
       );
-      assert.deepEqual(highlighted, ["callee", "callee", "object"]);
+      assert.deepEqual(highlighted, ["callee", "callee"]);
+      const hiddenRows = sourceRows(snapshot, caller.id, new Set([caller.id]));
+      assert.ok(
+        hiddenRows.every(
+          (row) => !row.highlights?.length && !row.children?.length,
+        ),
+      );
+      const visibleTargets = new Set(
+        fileHierarchy(snapshot, caller.file, caller.id).flatMap((row) =>
+          row.target ? [row.target] : [],
+        ),
+      );
+      assert.deepEqual(
+        sourceRows(snapshot, caller.id, visibleTargets).flatMap((row) =>
+          (row.highlights ?? []).map((span) =>
+            row.text.slice(span.start, span.end),
+          ),
+        ),
+        ["callee", "callee"],
+      );
+      assert.deepEqual(
+        rows.flatMap((row) =>
+          (row.children ?? []).map((span) =>
+            row.text.slice(span.start, span.end),
+          ),
+        ),
+        ["callee", "callee"],
+      );
+      assert.equal(
+        sourceSegments(
+          rows.find((row) => row.children?.length)!,
+          0,
+        )
+          .filter((segment) => segment.child)
+          .map((segment) => segment.text)
+          .join(" "),
+        "callee callee",
+      );
       const callRow = rows.find((row) => row.highlights?.length === 2)!;
       const offset = callRow.highlights![0]!.start + 2;
       const segments = sourceSegments(callRow, offset);

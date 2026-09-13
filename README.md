@@ -28,7 +28,7 @@ A function or object name is required:
 npx cvis <folder> <name>
 ```
 
-Omitting the name or passing an empty name rejects the command before reading files. Names match exactly, including capitalization. A name that is not found prints a message to standard output and exits. Duplicate names print their file locations instead of choosing one. With `--plain` or redirected output, a matching name prints the hierarchy as plain text.
+Omitting the name or passing an empty name rejects the command before reading files. Names match exactly, including capitalization. A name that is not found prints a message to standard output and exits. Duplicate names print their file locations instead of choosing one. With `--plaintext`, `--plain`, or redirected output, a matching name prints the hierarchy as plain text.
 
 ## Explore
 
@@ -39,16 +39,29 @@ submit()    workflow.ts:3
     saveDraft()    actions.ts:1
 ```
 
-Startup opens File hierarchy for the named function or object. Use the up and down arrows or `j` and `k` to move. The selected name has reversed foreground and background colors. Press `l`, Enter, or the right arrow to read its source. Press `h` or Escape to return to your previous selection. Back at the hierarchy keeps you there. Press `q` to quit. Ctrl+C clears the terminal and quits, including during loading.
+Startup opens File hierarchy for the named function or object. Use the up and down arrows or `j` and `k` to move. The selected name has reversed foreground and background colors. Press `l`, Enter, or the right arrow to read its source. Press `h` or Escape to return to your previous selection. Back at the hierarchy keeps you there. Press `q` to quit. Cmd+C copies the selected file’s full path to your clipboard in the hierarchy when your terminal forwards the shortcut to cvis. Ctrl+C clears the terminal and quits in every view, including during loading.
+
+Many terminals reserve Cmd+C for copying text selected with the mouse. To use it for the selected hierarchy row, configure the terminal to send `\x1b[99;9u` for Cmd+C, or forward Cmd+C using its enhanced keyboard support. cvis automatically detects supported terminals.
+
+For VS Code, add this to Keyboard Shortcuts (JSON). It forwards Cmd+C when the terminal has focus and no text is selected, preserving normal copying of selected text:
+
+```json
+{
+  "key": "cmd+c",
+  "command": "workbench.action.terminal.sendSequence",
+  "when": "terminalFocus && !terminalTextSelected",
+  "args": { "text": "\u001b[99;9u" }
+}
+```
 
 Callers and callees are discovered level by level, up to 10 links in each direction, then displayed as an indented call tree. Only caller branches leading to the requested declaration are shown above it. Below it, all callees are shown. Only the requested declaration is bold, with paths in muted grey. `[loop]` stops a circular branch, `[aforementioned]` points to a branch already expanded above. Selecting it highlights the original row if visible, and `g` jumps to that row. `[depth limit]` marks branches stopped at 10 links. The hierarchy uses only files included in the selected file or folder.
 
 Source includes the complete declaration body. Identified function and object references appear in red, including repeated mentions. Comments and strings are not highlighted. Scroll vertically with `j` and `k`, and horizontally with the left and right arrows. Page Up, Page Down, Ctrl+U, and Ctrl+D move a page. `g` and `G` move to the first and last rows. Source is read directly from the original file when opened. Keep files unchanged while browsing, and restart the command after editing files.
 
-Redirecting output automatically prints plain text. Use `--plain` to request it explicitly.
+Redirecting output automatically prints plain text. Use `--plaintext` to request it explicitly. It prints the hierarchy once with no colors, bold text, progress display, or interaction. `--plain` remains an alias.
 
 ```sh
-npx --no-install cvis src fileHierarchy --plain
+npx --no-install cvis src fileHierarchy --plaintext
 npx --no-install cvis src fileHierarchy > hierarchy.txt
 ```
 

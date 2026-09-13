@@ -469,6 +469,8 @@ export function analyze(
             references.push({
               start: node.getStart(source),
               end: node.getEnd(),
+              from: owner,
+              to: target.id,
             });
             result.references.set(file, references);
           }

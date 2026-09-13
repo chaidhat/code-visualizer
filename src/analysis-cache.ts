@@ -57,7 +57,17 @@ const snapshotSchema = z.object({
     }),
   ),
   references: z
-    .map(z.string(), z.array(z.object({ start: position, end: position })))
+    .map(
+      z.string(),
+      z.array(
+        z.object({
+          start: position,
+          end: position,
+          from: z.string(),
+          to: z.string(),
+        }),
+      ),
+    )
     .optional(),
 });
 const cacheSchema = z.object({

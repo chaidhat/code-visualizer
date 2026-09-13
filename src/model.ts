@@ -25,7 +25,10 @@ export interface Snapshot {
   declarations: Map<string, Declaration>;
   connections: Connection[];
   warnings: string[];
-  references?: Map<string, { start: number; end: number }[]>;
+  references?: Map<
+    string,
+    { start: number; end: number; from?: string; to?: string }[]
+  >;
 }
 
 export interface ReadProgress {
