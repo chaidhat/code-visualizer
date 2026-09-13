@@ -1,9 +1,7 @@
-<!-- BEGIN:nextjs-agent-rules -->
+# Project guidance
 
-# This is NOT the Next.js you know
+This project is a TypeScript and Node.js terminal tool. The current requested behavior is in `docs/prompt2.md`. There is no Next.js application.
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+Follow Chai's Law of Good Coding: correctness, reliability, and security first, maintainability second, and consistency third. Use TypeScript for language analysis and Ink for terminal interaction. Do not execute inspected projects or save source copies. Read original files when opening source, assuming files stay unchanged during browsing.
 
-This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
-
-<!-- END:nextjs-agent-rules -->
+Run `npm run typecheck`, `npm test`, `npm run build`, and `npm run format:check` for implementation changes. Do not commit or push without explicit permission.

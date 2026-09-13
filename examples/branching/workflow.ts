@@ -1,4 +1,4 @@
-import { saveDraft, publish } from "./actions";
+import { saveDraft, publish } from "./actions.js";
 
 export function submit(ready: boolean) {
   if (ready) publish();

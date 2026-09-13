@@ -1,55 +1,93 @@
-# Code Visualizer
+# cvis
 
-Explore a local TypeScript or JavaScript project as draggable file cards, declarations, and source-backed call connections. Source stays on your computer and selected projects are never executed or modified.
+Explore TypeScript files, calls, and object references in your terminal. Replaces the previous browser application.
 
-## Start
+## Run locally
 
-Requires Node.js 20.9 or newer and npm. The implementation was checked on Node.js 25.2.1 on macOS with Apple M4.
+Requires Node.js 22 or newer.
 
 ```sh
 npm install
-npm run dev
+npm run build
+npx --no-install cvis examples/branching submit
 ```
 
-Open `http://127.0.0.1:3000` in Arc. Choose **Select folder**, browse or paste an absolute path, then choose **Use this folder**. Try the included `examples/branching` folder first.
+During development:
 
-Use `npm run build` followed by `npm start` for the production build. Always use these scripts. They bind to loopback, disable Next.js telemetry, prepare the local workers, and create the session key used to protect file access. Restart `npm run dev` after changing analysis-worker code.
+```sh
+npm run dev -- examples/branching submit
+npm run dev -- /absolute/path/to/project myFunction
+npm run dev -- /absolute/path/to/file.ts myFunction
+```
+
+The package exposes the `cvis` command. After publishing this package under an available npm name, users can run `npx <package-name> <path/file> <name>`. This repository has not been published. Do not assume the public npm name `cvis` belongs to this project.
+
+A function or object name is required:
+
+```sh
+npx cvis <folder> <name>
+```
+
+Omitting the name or passing an empty name rejects the command before reading files. Names match exactly, including capitalization. A name that is not found prints a message to standard output and exits. Duplicate names print their file locations instead of choosing one. With `--plain` or redirected output, a matching name prints the hierarchy as plain text.
 
 ## Explore
 
-- Drag file cards and individual rows. Pin a row to detach it from its card while keeping its file label.
-- Select a declaration to highlight its connections. Select an arrow to read every source location behind it, then use **Go to target**.
-- Search all file and declaration names. Search results remain available when cards are collapsed or rows are not drawn.
-- Use **Focus** and the step selector to follow nearby calls. Toggle **External** and **Uncertain** to simplify the view.
-- Collapse files or nested declarations to group their connections. Overview zoom shows file boundaries. Large files draw up to 150 rows. Search or focus reveals other entries.
-- Use **Arrange** to run ELK in a browser worker. Dragging does not rerun analysis or arrangement.
-- Use **Refresh** after source changes. Unique surviving declarations retain saved positions. Ambiguous duplicate names lose saved positions rather than borrowing another entry's position.
-- **Clear saved layout** removes this project's saved positions, pins, and filters. Up to eight layouts are retained, with a 2 MB maximum per saved layout. Source code is never put in browser storage.
+Startup shows a progress bar with the number of selected TypeScript files read out of the discovered total. Each file is counted once. When reading reaches the total, the display says Analyzing until the results are ready. Press Ctrl+C to cancel loading. Plain text output does not include the progress display.
 
-## Read the arrows
+```text
+submit()    workflow.ts:3
+    saveDraft()    actions.ts:1
+```
 
-Solid arrows identify a declared target. Dashed arrows show possible or unresolved targets. Conditional context is listed separately in source evidence. Calls from every branch are inspected, including calls that may never run.
+Startup opens File hierarchy for the named function or object. Use the up and down arrows or `j` and `k` to move. The selected name has reversed foreground and background colors. Press `l`, Enter, or the right arrow to read its source. Press `h` or Escape to return to your previous selection. Back at the hierarchy keeps you there. Press `q` to quit. Ctrl+C clears the terminal and quits, including during loading.
 
-Passing a function is labeled **Passed as callback**. Its body owns its calls. Objects, constructors, methods, and initialization entries have separate ownership. Dynamic property names, reassigned function values, missing imports, and interface implementations without an established runtime target remain visibly uncertain.
+Callers and callees are discovered level by level, up to 10 links in each direction, then displayed as an indented call tree. Only caller branches leading to the requested declaration are shown above it. Below it, all callees are shown. Only the requested declaration is bold, with paths in muted grey. `[loop]` stops a circular branch, `[above]` points to a branch already expanded above. Selecting it highlights the original row if visible, and `g` jumps to that row. `[depth limit]` marks branches stopped at 10 links. The hierarchy uses only files included in the selected file or folder.
 
-This is a snapshot of source relationships, not a runtime trace. Missing arrows do not prove a declaration is unused. A changed source file must be refreshed before its evidence can be opened.
+Source includes the complete declaration body. Identified function and object references appear in red, including repeated mentions. Comments and strings are not highlighted. Scroll vertically with `j` and `k`, and horizontally with the left and right arrows. Page Up, Page Down, Ctrl+U, and Ctrl+D move a page. `g` and `G` move to the first and last rows. Source is read directly from the original file when opened. Keep files unchanged while browsing, and restart the command after editing files.
 
-## Checks
+Redirecting output automatically prints plain text. Use `--plain` to request it explicitly.
+
+```sh
+npx --no-install cvis src fileHierarchy --plain
+npx --no-install cvis src fileHierarchy > hierarchy.txt
+```
+
+## What the connections mean
+
+Indented rows show calls and references to functions, objects, classes, or types. Callers found within your selection appear above the requested declaration. Selecting a single file does not search the rest of the repository for its callers.
+
+The tool uses TypeScript's own parser and name resolution without invoking `tsc`, emitting project output, or running a full type-check during browsing. It reads each folder's nearest `tsconfig.json`, including inherited settings and import aliases. It scans selected `.ts`, `.tsx`, `.mts`, and `.cts` files even if a configuration excludes them. Declaration-only files are not listed, but TypeScript can read them to resolve dependencies.
+
+Functions, nested callbacks, methods, classes, object literals, object instances, interfaces, and type aliases are listed. Calls in every branch are inspected. Inline callbacks and local functions inside a function are folded into that surrounding function. Their calls appear directly under it, and its source preview still includes their full code. Top-level calls and object/class initializers appear under File initialization. Repeated connections are combined in the hierarchy. Overloaded calls open the implementation when available.
+
+Only resolved connections within the selected files appear in the hierarchy. Dynamic property calls, function aliases and conditional choices, missing dependencies, and detected reassignment can prevent a connection from being resolved. Missing imports and malformed source produce visible warnings. Malformed project settings stop the command with an error.
+
+Connections identify declarations in the source, not guaranteed runtime implementations or proof that a call executes. Interface dispatch, inheritance overrides, runtime mutation, callbacks invoked by libraries, and reflective code cannot be fully determined this way. Missing incoming arrows do not prove that a function is unused. Project references are not built. Each selected file uses its nearest configuration, while dependencies are resolved from the files already present on disk.
+
+## Performance and privacy
+
+Analysis runs in a separate worker with a larger call stack for long import chains and Node’s default memory allowance. TypeScript still needs memory for language analysis. The worker releases its compiler data and read cache when it exits. The viewer retains declaration and connection records, but no complete source snapshot. Source is read from the original file when opened, and formatted source rows are kept only for the current view. No source copies are written under `~/.cvis/`. Keep project files unchanged during browsing and restart after edits. Incoming links are indexed once, and only visible rows are rendered when moving the selection.
+
+Discovery skips symbolic links, hidden folders, dependency folders, folders named `__tests__` or `test` at any depth, and common build outputs. Files inside `__tests__` or `test` are also excluded when selected directly. It allows up to 10,000 source files, 128 MiB of discovered source, 2 MiB per file, and 40 nested folders. Analysis reads up to 256 MiB, including configuration and dependencies. Limits and skipped symbolic links are reported. Unreadable discovery paths fail visibly.
+
+All analysis is local. TypeScript may read imported files, dependency declarations, and inherited settings outside your selected folder. Only selected files can be opened in the viewer. The tool does not execute selected code, project scripts, or plugins, install project dependencies, upload source, or modify the selected project. Source and filenames are escaped before displaying terminal control characters.
+
+## Development checks
 
 ```sh
 npm run typecheck
 npm test
 npm run build
+npm run smoke
 npm run format:check
 npm run benchmark
+npm pack --dry-run
 ```
 
-With the app running, `npm run smoke` verifies the local routes using the example project. It replaces the current in-memory project, so select your folder again afterward.
+See [validation](docs/validation.md) for measured results and limits, and [design](docs/design/code-visualizer.md) for ownership and flow. Existing tools used are [TypeScript](https://github.com/microsoft/TypeScript/wiki/Using-the-Compiler-API) and [Ink](https://github.com/vadimdemedes/ink).
 
-See [validation results](docs/validation.md), the [implementation design](docs/design/code-visualizer.md), and [local privacy boundaries](docs/design/privacy.md).
+## Saved analysis
 
-## Implementation and dependencies
+cvis automatically saves analysis records under `~/.cvis/analysis/`. On the next run it checks file contents, settings, dependency reads, and import lookups before reusing results. Unchanged projects skip analysis. Changed modules and their dependent files are reanalyzed, while unrelated records are reused. The viewer shows how many files were reused.
 
-The app uses Next.js and React Flow. The analyzer uses TypeScript 5.9.3 because it supplies the stable Compiler API and Language Service used here. TypeScript 7 uses a different API. Dependencies are pinned in `package.json` and the npm lockfile.
-
-ELK's original worker is copied from the installed `elkjs` package during worker preparation. Its license notice remains in that generated local asset. No worker or page script is loaded from a hosted service. Official references: [Next.js routes](https://nextjs.org/docs/app/getting-started/route-handlers), [TypeScript Language Service](https://github.com/microsoft/TypeScript/wiki/Using-the-Language-Service-API), [React Flow groups](https://reactflow.dev/learn/layouting/sub-flows), and [ELK](https://github.com/kieler/elkjs).
+Added or deleted files, shared settings, dependency changes, and global declarations can require a full rebuild. TypeScript may still load related code to understand a changed file. Saved results contain names, paths, connections, warnings, and checksums, but no full source copies. Source is read directly when opened. Delete `~/.cvis/analysis/` to clear saved analysis. Unreadable or damaged saved data produces a warning and a fresh analysis.
