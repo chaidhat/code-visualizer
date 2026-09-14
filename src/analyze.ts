@@ -55,6 +55,30 @@ function definition(
       ts.isPropertyDeclaration(parent)
         ? parent
         : node;
+    // A query inside procedure({ ... }) belongs to the surrounding route key.
+    // Stop at other declarations so an unrelated outer key is never borrowed.
+    if (
+      name === "query" &&
+      (ts.isPropertyAssignment(span) || ts.isMethodDeclaration(span)) &&
+      ts.isObjectLiteralExpression(span.parent)
+    ) {
+      let container: ts.Node = span.parent.parent;
+      while (
+        ts.isCallExpression(container) ||
+        ts.isParenthesizedExpression(container) ||
+        ts.isAsExpression(container) ||
+        ts.isSatisfiesExpression(container)
+      ) {
+        container = container.parent;
+      }
+      if (ts.isPropertyAssignment(container)) {
+        return {
+          kind: "function",
+          name: `${container.name.getText()}: query`,
+          span,
+        };
+      }
+    }
     return { kind: "function", name, span };
   }
   if (ts.isClassDeclaration(node) || ts.isClassExpression(node))

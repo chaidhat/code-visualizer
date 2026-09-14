@@ -26,6 +26,52 @@ function fixture(files: Record<string, string>, run: (root: string) => void) {
   }
 }
 
+test("qualifies route queries with their enclosing property key", () => {
+  fixture(
+    {
+      "main.ts": `
+        declare function procedure(options: unknown): unknown;
+        function upload() {}
+        const routes = {
+          uploadContent: procedure({ query: async () => { upload(); } }),
+          downloadImage: procedure({ query() {} }),
+          direct: { query: () => {} },
+          unrelated: procedure({ run: () => {} }),
+          factory: () => { const options = { query: () => {} }; return options; },
+        };
+        const options = { query: () => {} };
+        function query() {}
+      `,
+    },
+    (root) => {
+      const snapshot = analyze(root);
+      const declarations = [...snapshot.declarations.values()];
+      const names = declarations.map((declaration) => declaration.name);
+      assert.ok(names.includes("uploadContent: query"));
+      assert.ok(names.includes("downloadImage: query"));
+      assert.ok(names.includes("direct: query"));
+      assert.ok(names.includes("run"));
+      assert.equal(names.filter((name) => name === "query").length, 2);
+      assert.ok(!names.includes("factory: query"));
+      const route = declarations.find(
+        (d) => d.name === "uploadContent: query",
+      )!;
+      const upload = declarations.find((d) => d.name === "upload")!;
+      assert.ok(
+        snapshot.connections.some(
+          (edge) => edge.from === route.id && edge.to === upload.id,
+        ),
+      );
+      assert.match(
+        fileHierarchy(snapshot, "main.ts")
+          .map((row) => row.text)
+          .join("\n"),
+        /uploadContent: query\(\)/,
+      );
+    },
+  );
+});
+
 test("resolves aliases, re-exports, both branches, nested ownership and object/type references", () => {
   fixture(
     {
