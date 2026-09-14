@@ -2,7 +2,7 @@
 import { parseArgs } from "node:util";
 import { readFileSync } from "node:fs";
 import { findDeclaration } from "./find-declaration.js";
-import { fileHierarchy } from "./hierarchy.js";
+import { jsonHierarchy } from "./json-output.js";
 import { runAnalysis } from "./run-analysis.js";
 import { safeText } from "./display.js";
 
@@ -11,18 +11,22 @@ process.stdout.on("error", (error: NodeJS.ErrnoException) => {
   throw error;
 });
 
+let jsonOutput =
+  !process.stdin.isTTY ||
+  !process.stdout.isTTY ||
+  process.argv.slice(2).includes("--json");
+
 try {
   const { values, positionals } = parseArgs({
     options: {
       help: { type: "boolean", short: "h" },
       version: { type: "boolean", short: "v" },
-      plain: { type: "boolean" },
-      plaintext: { type: "boolean" },
+      json: { type: "boolean" },
     },
     allowPositionals: true,
   });
   if (values.help) {
-    console.log(`Usage: cvis <path/file> <name> [--plaintext]
+    console.log(`Usage: cvis <path/file> <name> [--json]
 
 Explore .ts, .tsx, .mts and .cts files, excluding declaration-only files.
 A function or object name is required and matches exactly, including case.
@@ -39,12 +43,11 @@ Unknown or duplicate names print a message. Quote names containing spaces.
   Cmd+C          Copy selected file path in hierarchy (terminal must forward it)
   Ctrl+C         Clear the terminal and quit
 
---plaintext      Print the hierarchy once without formatting or interaction
---plain          Alias for --plaintext
+--json           Print one JSON result without interaction
 --version, -v    Print version
 --help, -h       Show help
 
-Piped output is automatically plain text. Analysis stays local. Saved analysis under ~/.cvis/analysis/ is checked before reuse.
+Piped output is automatically JSON. Analysis stays local. Saved analysis under ~/.cvis/analysis/ is checked before reuse.
 Source is read from original files when opened. Keep files unchanged while browsing.
 Connections describe source declarations, not guaranteed runtime behavior.
 Only resolved connections within the selected file or folder are shown.`);
@@ -59,11 +62,8 @@ Only resolved connections within the selected file or folder are shown.`);
         "Provide a TypeScript file or folder and a required function or object name. Run cvis --help for usage.",
       );
     const name = positionals[1];
-    const interactive =
-      !values.plain &&
-      !values.plaintext &&
-      !!process.stdin.isTTY &&
-      !!process.stdout.isTTY;
+    jsonOutput = !!values.json || !process.stdin.isTTY || !process.stdout.isTTY;
+    const interactive = !jsonOutput;
     if (interactive) {
       const [{ render }, { Explorer }, { ReadingProgress }] = await Promise.all(
         [import("ink"), import("./ui.js"), import("./reading-progress.js")],
@@ -119,21 +119,15 @@ Only resolved connections within the selected file or folder are shown.`);
       }
     } else {
       const snapshot = await runAnalysis(positionals[0]);
-      const match = findDeclaration(snapshot, name);
-      if (match.message !== undefined) console.log(match.message);
-      else {
-        const rows = fileHierarchy(
-          snapshot,
-          match.declaration.file,
-          match.declaration.id,
-        );
-        console.log(rows.map((row) => row.text).join("\n"));
-      }
+      console.log(JSON.stringify(jsonHierarchy(snapshot, name), null, 2));
     }
   }
 } catch (error) {
-  console.error(
-    `cvis: ${safeText(error instanceof Error ? error.message : String(error))}`,
+  const message = safeText(
+    error instanceof Error ? error.message : String(error),
   );
+  if (jsonOutput)
+    console.log(JSON.stringify({ version: 1, status: "error", message }));
+  else console.error(`cvis: ${message}`);
   process.exitCode = 1;
 }

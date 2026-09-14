@@ -14,4 +14,4 @@ Only objects and functions present in the current hierarchy receive special sour
 
 In the hierarchy, Cmd+C copies the selected row’s absolute file path to the clipboard and reports success or failure. It keeps the viewer open. Ctrl+C cancels and quits in every view. Cmd+C requires the terminal to forward the shortcut using enhanced keyboard input or a mapping to `\x1b[99;9u`.
 
-Pass `--plaintext` to print the hierarchy once to standard output without styling, progress, or interaction. `--plain` remains an alias, and redirected output is automatically plain text.
+Pass `--json` to print one structured result to standard output without styling, progress, or interaction. Redirected output is automatically JSON. Remove `--plaintext` and `--plain`. Include only the rows shown in the text hierarchy, in the same order, with names, kinds, file locations, and stop markers. Nest descendants under a `child` array on each item, using an empty array for leaves and stopped branches. Do not include separate connections, scope metadata, or warnings. Unknown names, ambiguous names, and errors also produce JSON results. Help and version remain ordinary text.

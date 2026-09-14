@@ -10,6 +10,8 @@ export interface Row {
   pathText?: string;
   bold?: boolean;
   aboveRow?: number;
+  depth?: number;
+  stopReason?: "loop" | "aforementioned" | "depth_limit";
   highlights?: { start: number; end: number }[];
   children?: { start: number; end: number }[];
   target?: string;

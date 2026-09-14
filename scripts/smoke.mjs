@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,70 +14,77 @@ const run = (...args) =>
     encoding: "utf8",
     timeout: 30000,
   });
-const plain = run(fixture, "submit");
-assert.equal(plain.status, 0, plain.stderr);
-assert.match(plain.stdout, /saveDraft\(\)\s+actions.ts:1/);
-assert.match(plain.stdout, /submit\(\)/);
-assert.doesNotMatch(plain.stdout, /\x1b/);
-const plaintext = run(fixture, "submit", "--plaintext");
-assert.equal(plaintext.status, 0, plaintext.stderr);
-assert.equal(plaintext.stderr, "");
-assert.equal(plaintext.stdout, plain.stdout);
-assert.doesNotMatch(plaintext.stdout, /\x1b|Finding TypeScript|j\/k move/);
-assert.match(run("--help").stdout, /--plaintext/);
+const result = (...args) => {
+  const output = run(...args);
+  assert.equal(output.stderr, "");
+  assert.doesNotMatch(output.stdout, /\x1b/);
+  return { ...output, data: JSON.parse(output.stdout) };
+};
+const automatic = result(fixture, "submit");
+assert.equal(automatic.status, 0);
+assert.equal(automatic.data.status, "ok");
+assert.ok(
+  automatic.data.hierarchy[0].child[0].child[0].child.some(
+    (item) => item.name === "saveDraft" && item.line === 1,
+  ),
+);
+const explicit = result(fixture, "submit", "--json");
+assert.deepEqual(explicit.data, automatic.data);
+assert.match(run("--help").stdout, /--json/);
+assert.doesNotMatch(run("--help").stdout, /--plain/);
 assert.equal(run("--version").stdout.trim(), "0.1.0");
-assert.equal(run().status, 1);
-assert.equal(run("--unknown").status, 1);
-assert.equal(run("/does-not-exist-cvis", "hello").status, 1);
 for (const args of [
+  [],
   [fixture],
-  [fixture, "--plain"],
-  [fixture, "--plaintext"],
   [fixture, ""],
   [fixture, "   "],
+  ["--unknown"],
+  [fixture, "submit", "--plain"],
+  [fixture, "submit", "--plaintext"],
+  ["/does-not-exist-cvis", "hello"],
 ]) {
-  const rejected = run(...args);
+  const rejected = result(...args);
   assert.equal(rejected.status, 1);
-  assert.match(rejected.stderr, /required function or object name/);
-  assert.equal(rejected.stdout, "");
+  assert.equal(rejected.data.status, "error");
 }
 const root = mkdtempSync(join(tmpdir(), "cvis smoke "));
 try {
   writeFileSync(join(root, "main.ts"), "export function hello() {}");
-  assert.equal(run(root, "hello", "--plain").status, 0);
-  const named = run(root, "hello");
-  assert.equal(named.status, 0, named.stderr);
-  assert.match(named.stdout, /hello\(\)\s+main.ts:1/);
-  const missing = run(root, "missing");
-  assert.equal(missing.status, 0);
-  assert.equal(missing.stderr, "");
+  const named = result(root, "hello", "--json");
+  assert.equal(named.status, 0);
   assert.equal(
-    missing.stdout.trim(),
-    'No function or object named "missing" found.',
+    named.data.hierarchy[0].path,
+    realpathSync(join(root, "main.ts")),
   );
-  assert.match(run(root, "Hello").stdout, /No function or object/);
+  for (const name of ["missing", "Hello"]) {
+    const missing = result(root, name);
+    assert.equal(missing.status, 0);
+    assert.equal(missing.data.status, "not_found");
+    assert.deepEqual(missing.data.matches, []);
+  }
   writeFileSync(
     join(root, "object.ts"),
     "export const settings = { enabled: true };",
   );
-  assert.match(
-    run(root, "settings", "--plain").stdout,
-    /settings\s+object.ts:1/,
+  assert.equal(
+    result(root, "settings", "--json").data.hierarchy[0].kind,
+    "object",
   );
   writeFileSync(join(root, "duplicate.ts"), "export function hello() {}");
-  const duplicate = run(root, "hello");
-  assert.equal(duplicate.status, 0);
-  assert.match(duplicate.stdout, /Multiple declarations/);
-  assert.match(duplicate.stdout, /duplicate.ts:1/);
-  assert.match(duplicate.stdout, /main.ts:1/);
-  assert.equal(run(root, "hello", "extra").status, 1);
+  const duplicate = result(root, "hello");
+  assert.equal(duplicate.data.status, "ambiguous");
+  assert.deepEqual(duplicate.data.matches.map((item) => item.file).sort(), [
+    "duplicate.ts",
+    "main.ts",
+  ]);
+  assert.equal(result(root, "hello", "extra").status, 1);
   writeFileSync(join(root, "tsconfig.json"), "{broken");
-  const failure = run(root, "hello");
+  const failure = result(root, "hello");
   assert.equal(failure.status, 1);
-  assert.match(failure.stderr, /cvis:/);
+  assert.equal(failure.data.status, "error");
 } finally {
   rmSync(root, { recursive: true, force: true });
 }
 console.log(
-  "Packaged command checks passed: worker startup, plain output, help, version, paths with spaces, argument errors, and worker failures.",
+  "Packaged command checks passed: worker startup, JSON output, help, version, paths with spaces, argument errors, and worker failures.",
 );

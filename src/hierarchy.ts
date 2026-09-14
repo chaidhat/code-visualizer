@@ -1,7 +1,7 @@
 import type { Snapshot } from "./model.js";
 import { label, safeText, type Row } from "./display.js";
 
-const MAX_DEPTH = 10;
+export const MAX_DEPTH = 10;
 
 /** Discover callers and callees breadth first, then display their call tree. */
 export function fileHierarchy(
@@ -101,13 +101,14 @@ export function fileHierarchy(
       (child) => belowTarget || ancestors.has(child),
     );
     const key = expansionKey(id, belowTarget);
-    const marker = path.has(id)
-      ? " [loop]"
+    const stopReason = path.has(id)
+      ? "loop"
       : expanded.has(key)
-        ? " [aforementioned]"
+        ? "aforementioned"
         : depth === MAX_DEPTH && children.length
-          ? " [depth limit]"
-          : "";
+          ? "depth_limit"
+          : undefined;
+    const marker = stopReason ? ` [${stopReason.replace("_", " ")}]` : "";
     const name = safeText(
       `${"    ".repeat(depth)}${label(declaration)}${marker}`,
     );
@@ -119,6 +120,8 @@ export function fileHierarchy(
       pathText: text.slice(name.length),
       bold: declaration.id === focus,
       target: id,
+      depth,
+      stopReason,
       aboveRow: marker === " [aforementioned]" ? expanded.get(key) : undefined,
     });
     if (marker) return;

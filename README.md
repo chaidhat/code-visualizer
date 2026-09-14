@@ -28,11 +28,11 @@ A function or object name is required:
 npx cvis <folder> <name>
 ```
 
-Omitting the name or passing an empty name rejects the command before reading files. Names match exactly, including capitalization. A name that is not found prints a message to standard output and exits. Duplicate names print their file locations instead of choosing one. With `--plaintext`, `--plain`, or redirected output, a matching name prints the hierarchy as plain text.
+Omitting the name or passing an empty name rejects the command before reading files. Names match exactly, including capitalization. A name that is not found prints a message to standard output and exits. Duplicate names print their file locations instead of choosing one. With `--json` or redirected output, a matching name prints the hierarchy as one JSON result.
 
 ## Explore
 
-Startup shows a progress bar with the number of selected TypeScript files read out of the discovered total. Each file is counted once. When reading reaches the total, the display says Analyzing until the results are ready. Press Ctrl+C to cancel loading. Plain text output does not include the progress display.
+Startup shows a progress bar with the number of selected TypeScript files read out of the discovered total. Each file is counted once. When reading reaches the total, the display says Analyzing until the results are ready. Press Ctrl+C to cancel loading. JSON output does not include the progress display.
 
 ```text
 submit()    workflow.ts:3
@@ -58,12 +58,16 @@ Callers and callees are discovered level by level, up to 10 links in each direct
 
 Source includes the complete declaration body. Identified function and object references appear in red, including repeated mentions. Comments and strings are not highlighted. Scroll vertically with `j` and `k`, and horizontally with the left and right arrows. Page Up, Page Down, Ctrl+U, and Ctrl+D move a page. `g` and `G` move to the first and last rows. Source is read directly from the original file when opened. Keep files unchanged while browsing, and restart the command after editing files.
 
-Redirecting output automatically prints plain text. Use `--plaintext` to request it explicitly. It prints the hierarchy once with no colors, bold text, progress display, or interaction. `--plain` remains an alias.
+Redirecting output automatically prints JSON. Use `--json` to request it explicitly. The old `--plaintext` and `--plain` flags are no longer supported.
 
 ```sh
-npx --no-install cvis src fileHierarchy --plaintext
-npx --no-install cvis src fileHierarchy > hierarchy.txt
+npx --no-install cvis src fileHierarchy --json
+npx --no-install cvis src fileHierarchy > hierarchy.json
 ```
+
+JSON results have `version: 1` and a `status` of `ok`, `not_found`, `ambiguous`, or `error`. Successful results contain only the same hierarchy rows as the text view, in the same order. Each item includes its name, kind, file, full path, starting line, and stop marker. Children are nested in a `child` array, with `child: []` for leaves and stopped branches. The `hierarchy` array contains the roots. Item indices and references to original rows are zero-based in depth-first display order. External, unresolved, and other connections absent from the text view are excluded.
+
+Unknown and ambiguous names include a message and matching declarations. Errors produce one JSON result and exit with status 1. Help and version remain ordinary text.
 
 ## What the connections mean
 
